@@ -1,2 +1,96 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+public Program()
+{
+    Runtime.UpdateFrequency = UpdateFrequency.Update10;
+}
+
+public void Save()
+{
+    // Save data when the script is terminated (if necessary).
+}
+
+public void Main(string argument, UpdateType updateSource)
+{
+    // Configure the name of the hinge and the wheels
+    string hingeName = "hinge1";
+    string wheelGroupName = "wheel2";
+
+    // Reference the hinge block
+    IMyMotorStator hinge = GridTerminalSystem.GetBlockWithName(hingeName) as IMyMotorStator;
+    if (hinge == null)
+    {
+        Echo("Hinge not found!");
+        return;
+    }
+
+    // Reference the control seat
+    IMyShipController controller = GridTerminalSystem.GetBlockWithName("maincontrol") as IMyShipController;
+    if (controller == null)
+    {
+        Echo("Control seat not found!");
+        return;
+    }
+
+    // Reference all wheels
+    List<IMyMotorSuspension> wheels = new List<IMyMotorSuspension>();
+    GridTerminalSystem.GetBlocksOfType(wheels, wheel => wheel.CustomName.Contains(wheelGroupName));
+    if (wheels.Count == 0)
+    {
+        Echo("No wheels found!");
+        return;
+    }
+
+    // Capture input from the control seat
+    bool isADown = controller.MoveIndicator.X < -0.5;
+    bool isDDown = controller.MoveIndicator.X > 0.5;
+    bool isWDown = controller.MoveIndicator.Z < -0.05;
+    bool isSDown = controller.MoveIndicator.Z > 0.05;
+    bool isPDown = controller.HandBrake;
+
+    // Control logic for the hinge
+    if (isADown)
+    {
+        hinge.TargetVelocityRPM = -5.0f; // Adjust speed as needed
+    }
+    else if (isDDown)
+    {
+        hinge.TargetVelocityRPM = 5.0f; // Adjust speed as needed
+    }
+    else
+    {
+        hinge.TargetVelocityRPM = 0.0f; // Stop the hinge if no key is pressed
+    }
+
+    // Control logic for the wheels
+    float wheelSpeed = 1.0f; // Speed of the wheels
+    foreach (var wheel in wheels)
+    {
+        if (isPDown)
+        {
+            wheel.Brake = true;
+            wheel.PropulsionOverride = 0.0f;
+        }
+        else
+        {
+            wheel.Brake = false;
+            if (isWDown)
+            {
+                wheel.PropulsionOverride = wheelSpeed;
+            }
+            else if (isSDown)
+            {
+                wheel.PropulsionOverride = -wheelSpeed;
+            }
+            else
+            {
+                wheel.PropulsionOverride = 0.0f; // Stop the wheel if no key is pressed
+            }
+        }
+    }
+
+    // Output for debugging
+    Echo("Hinge Velocity: " + hinge.TargetVelocityRPM);
+    Echo("Wheels Count: " + wheels.Count);
+    Echo("Move Forward: " + isWDown);
+    Echo("Move Backward: " + isSDown);
+    Echo("Handbrake: " + isPDown);
+}
